@@ -1,0 +1,13 @@
+@namespace MyPocketList.Pages.Components
+
+<ol>
+    @foreach (var i in Items) {
+        <li>@i</li>
+    }
+</ol>
+@code {
+
+    public List<string> Items {get;set;}=new List<string>() {
+        "Item1", "Item2", "Item3"
+    };
+}
