@@ -4,7 +4,18 @@ using MyPocketList.Core.Results;
 
 namespace MyPocketList.Core.Services;
 
-public class ShoppingService
+public interface IShoppingService
+{
+    Result<ShoppingItem> AddItem(string name);
+    Result<ShoppingList> GetShoppedItems();
+    Result RemoveFromBasket(Guid id);
+    Result RemoveItem(Guid itemId);
+    void SetShoppingList(ShoppingList list);
+    Result Shop(Guid itemId);
+    Result<ShoppingItem> Update(Guid id, ShoppingItem newItem);
+}
+
+public class ShoppingService : IShoppingService
 {
     private ShoppingList _shoppingList;
 
@@ -83,7 +94,7 @@ public class ShoppingService
         {
             return Result<ShoppingList>.Fail("No shopped items found.");
         }
-        
+
         var lst = new ShoppingList();
         foreach (var i in items)
         {
@@ -97,5 +108,35 @@ public class ShoppingService
         }
 
         return Result<ShoppingList>.Ok(lst);
+    }
+
+    public Result RemoveFromBasket(Guid id)
+    {
+        var item = _shoppingList.Items.FirstOrDefault(i => i.Id == id);
+        if (item == null)
+        {
+            return Result.Fail("Item not found.");
+        }
+        if (item.State != ItemState.InBasket)
+        {
+            return Result.Fail("Item is not in basket.");
+        }
+
+        //should move from basket to "shopped"
+        item.State = ItemState.Shopped;
+        return Result.Ok();
+    }
+
+    public Result<ShoppingItem> Update(Guid id, ShoppingItem newItem)
+    {
+        var item = _shoppingList.Items.FirstOrDefault(i => i.Id == id);
+        if (item == null)
+        {
+            return Result<ShoppingItem>.Fail("Item not found.");
+        }
+
+        item.Name = newItem.Name;
+        item.State = newItem.State;
+        return Result<ShoppingItem>.Ok(item);
     }
 }
