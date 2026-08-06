@@ -1,4 +1,6 @@
-﻿@page "/"
+﻿@using MyPocketList.Pages.Components
+@inject IDialogService DialogService
+@page "/"
 
 <PageTitle>My Pocket List</PageTitle>
 
@@ -10,9 +12,28 @@
     </FluentTab>
     <FluentTab Label="Shop">
         <p>Manage your shopping items.</p>
-        <ListsComponent/>
+        <ListsComponent />
     </FluentTab>
     <FluentTab Label="Basket">
         <p>View your shopped items</p>
     </FluentTab>
 </FluentTabs>
+
+@code {
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ShowDialog();
+        }
+    }
+    
+    private async Task ShowDialog()
+    {
+        var dialogParams = new DialogParameters
+        {
+            Title = "This is some kind of test."
+        };
+        await DialogService.ShowDialogAsync<Dialog>(dialogParams);
+    }
+}
