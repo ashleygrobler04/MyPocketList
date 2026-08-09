@@ -1,5 +1,6 @@
 ﻿@using MyPocketList.Pages.Components
-@inject IDialogService DialogService
+@using MyPocketList.Service
+@inject IInfoService infoService
 @page "/"
 
 <PageTitle>My Pocket List</PageTitle>
@@ -19,21 +20,28 @@
     </FluentTab>
 </FluentTabs>
 
+<FluentButton Appearance="Appearance.Accent" @onclick="ShowTestAlert">
+    Show alert
+</FluentButton>
+<FluentSpacer/>
+<FluentButton Appearance="Appearance.Accent" @onclick="ShowConfirmation">
+    Test confirmation
+</FluentButton>
+
 @code {
-        protected override async Task OnAfterRenderAsync(bool firstRender)
+
+    private async void ShowTestAlert()
     {
-        if (firstRender)
-        {
-            await ShowDialog();
-        }
+        await infoService.Alert("This is some kind of test that I hope is working for me today.");
     }
-    
-    private async Task ShowDialog()
-    {
-        var dialogParams = new DialogParameters
-        {
-            Title = "This is some kind of test."
-        };
-        await DialogService.ShowDialogAsync<Dialog>(dialogParams);
+
+    private async void ShowConfirmation() {
+        var res=await infoService.Confirm("Do you want to do this?");
+        if (res) {
+            await infoService.Alert("You pressed Ok");
+        }
+        else {
+            await infoService.Alert("Why did you cancel?");
+        }
     }
 }
