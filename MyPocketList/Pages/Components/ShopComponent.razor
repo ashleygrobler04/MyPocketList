@@ -1,0 +1,96 @@
+@namespace MyPocketList.Pages.Components
+@using MyPocketList.Core.Enums
+@using MyPocketList.Core.Models
+@using MyPocketList.Core.Services
+@using MyPocketList.Services
+
+@inject IShoppingListService listService
+@inject IShoppingService shoppingService
+@inject IInfoService infoService
+
+<h2>Shop</h2>
+<p>Pick a list and click items to move them to your basket as you shop.</p>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16">
+    <FluentSelect TOption="ShoppingList"
+                  Id="shop-list-select"
+                  Label="List to shop from"
+                  Items="@_selectableLists"
+                  OptionText="@(list => list.Name)"
+                  SelectedOption="SelectedList"
+                  SelectedOptionChanged="@HandleListSelected" />
+
+    @if (SelectedList is null)
+    {
+        <p>Select a list to start shopping, or create one in the Lists tab.</p>
+    }
+    else
+    {
+        <section aria-label="Items in @SelectedList.Name">
+            @if (ActiveItems.Count == 0)
+            {
+                <p>No items to shop. Add items to this list in the Lists tab.</p>
+            }
+            else
+            {
+                <p class="hint">Click an item to move it to your basket.</p>
+                <ul class="list-rows">
+                    @foreach (var item in ActiveItems)
+                    {
+                        <li class="list-row">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                                <FluentButton Appearance="Appearance.Lightweight"
+                                              aria-label="@($"Move {item.Name} to the basket")"
+                                              Title="Click to move to the basket"
+                                              @onclick="() => ShopItem(item)">
+                                    <span class="list-name">@item.Name</span>
+                                </FluentButton>
+                            </FluentStack>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    }
+</FluentStack>
+
+@code {
+
+    [Parameter]
+    public ShoppingList? SelectedList { get; set; }
+
+    [Parameter]
+    public EventCallback<ShoppingList> OnListSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnDataChanged { get; set; }
+
+    private List<ShoppingList> _selectableLists = new();
+
+    private List<ShoppingItem> ActiveItems =>
+        SelectedList?.Items.Where(i => i.State != ItemState.Shopped).ToList()
+        ?? new List<ShoppingItem>();
+
+    protected override void OnParametersSet()
+    {
+        _selectableLists = listService.Lists.ToList();
+    }
+
+    private async Task HandleListSelected(ShoppingList list)
+    {
+        await OnListSelected.InvokeAsync(list);
+    }
+
+    private async Task ShopItem(ShoppingItem item)
+    {
+        var result = shoppingService.Shop(item.Id);
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        await listService.SaveAsync();
+        await OnDataChanged.InvokeAsync();
+    }
+}

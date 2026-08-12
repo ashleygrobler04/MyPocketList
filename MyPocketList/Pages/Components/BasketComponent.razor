@@ -1,0 +1,84 @@
+@namespace MyPocketList.Pages.Components
+@using MyPocketList.Core.Models
+@using MyPocketList.Core.Services
+@using MyPocketList.Services
+
+@inject IShoppingListService listService
+@inject IShoppingService shoppingService
+@inject IInfoService infoService
+
+<h2>Basket</h2>
+
+@if (ActiveList is null)
+{
+    <p>Select a list to shop from in the Shop tab to see what you have shopped.</p>
+}
+else
+{
+    <p>Shopped from "@ActiveList.Name":</p>
+
+    @if (shoppingService.GetShoppedItems() is { Succeeded: true } shopped)
+    {
+        <p class="hint">Click an item to move it back to the shop list.</p>
+        <ul class="list-rows">
+            @foreach (var item in shopped.Value!.Items)
+            {
+                <li class="list-row">
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      aria-label="@($"Move {item.Name} back to the shop list")"
+                                      Title="Click to move back to the shop list"
+                                      @onclick="() => MoveBackToShop(item)">
+                            <span class="list-name">@item.Name</span>
+                        </FluentButton>
+                        <FluentSpacer />
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      IconStart="@(new Icons.Regular.Size20.Delete())"
+                                      @onclick="() => RemoveItem(item)">
+                            Remove
+                        </FluentButton>
+                    </FluentStack>
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p>Nothing shopped yet. Click items in the Shop tab to add them to your basket.</p>
+    }
+}
+
+@code {
+
+    [Parameter]
+    public ShoppingList? ActiveList { get; set; }
+
+    [Parameter]
+    public EventCallback OnDataChanged { get; set; }
+
+    private async Task MoveBackToShop(ShoppingItem item)
+    {
+        var result = shoppingService.MoveToShop(item.Id);
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        await listService.SaveAsync();
+        await OnDataChanged.InvokeAsync();
+    }
+
+    private async Task RemoveItem(ShoppingItem item)
+    {
+        var result = shoppingService.RemoveItem(item.Id);
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        await listService.SaveAsync();
+        await OnDataChanged.InvokeAsync();
+    }
+}

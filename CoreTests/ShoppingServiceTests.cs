@@ -61,6 +61,7 @@ public class ShoppingServiceTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(ItemState.Shopped, list.Items.Single().State);
+        Assert.True(list.Items.Single().Shopped);
     }
 
     [Fact]
@@ -88,7 +89,7 @@ public class ShoppingServiceTests
         var result = service.Shop(item.Id);
 
         Assert.False(result.Succeeded);
-        Assert.Equal("ITem is in basket. Please remove from basket.", result.Message);
+        Assert.Equal("Item is in basket. Please remove from basket.", result.Message);
     }
 
     [Fact]
@@ -111,6 +112,47 @@ public class ShoppingServiceTests
         var service = new ShoppingService(list);
 
         var result = service.RemoveItem(Guid.NewGuid());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Item not found.", result.Message);
+    }
+
+    [Fact]
+    public void MoveToShop_WhenItemIsShopped_MovesItBackToDefault()
+    {
+        var list = new ShoppingList();
+        var service = new ShoppingService(list);
+        var item = service.AddItem("Milk").Value!;
+        service.Shop(item.Id);
+
+        var result = service.MoveToShop(item.Id);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(ItemState.Default, list.Items.Single().State);
+        Assert.False(list.Items.Single().Shopped);
+    }
+
+    [Fact]
+    public void MoveToShop_WhenItemIsNotShopped_ReturnsFailure()
+    {
+        var list = new ShoppingList();
+        var service = new ShoppingService(list);
+        var item = service.AddItem("Milk").Value!;
+
+        var result = service.MoveToShop(item.Id);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Item is not shopped.", result.Message);
+        Assert.Equal(ItemState.Default, item.State);
+    }
+
+    [Fact]
+    public void MoveToShop_WhenItemDoesNotExist_ReturnsFailure()
+    {
+        var list = new ShoppingList();
+        var service = new ShoppingService(list);
+
+        var result = service.MoveToShop(Guid.NewGuid());
 
         Assert.False(result.Succeeded);
         Assert.Equal("Item not found.", result.Message);
@@ -193,7 +235,37 @@ public class ShoppingServiceTests
         Assert.NotNull(result.Value);
         Assert.Equal("Cheese", item.Name);
         Assert.Equal(ItemState.InBasket, item.State);
+        Assert.False(item.Shopped);
         Assert.Equal(item.Id, result.Value.Id);
+    }
+
+    [Fact]
+    public void Update_WhenNameIsEmpty_ReturnsFailure()
+    {
+        var list = new ShoppingList();
+        var service = new ShoppingService(list);
+        var item = service.AddItem("Milk").Value!;
+
+        var result = service.Update(item.Id, new ShoppingItem { Name = "   " });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Item name cannot be empty.", result.Message);
+        Assert.Equal("Milk", item.Name);
+    }
+
+    [Fact]
+    public void Update_WhenNameIsDuplicate_ReturnsFailure()
+    {
+        var list = new ShoppingList();
+        var service = new ShoppingService(list);
+        service.AddItem("Milk");
+        var bread = service.AddItem("Bread").Value!;
+
+        var result = service.Update(bread.Id, new ShoppingItem { Name = "milk" });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Item with the same name already exists.", result.Message);
+        Assert.Equal("Bread", bread.Name);
     }
 
     [Fact]

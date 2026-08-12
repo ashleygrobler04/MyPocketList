@@ -1,6 +1,6 @@
 using Microsoft.JSInterop;
 
-namespace MyPocketList.Service;
+namespace MyPocketList.Services;
 
 public interface IInfoService
 {

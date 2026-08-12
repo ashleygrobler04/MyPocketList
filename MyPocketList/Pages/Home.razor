@@ -1,5 +1,8 @@
-﻿@using MyPocketList.Pages.Components
-@using MyPocketList.Service
+﻿@using MyPocketList.Core.Models
+@using MyPocketList.Core.Services
+@using MyPocketList.Services
+@inject IShoppingListService listService
+@inject IShoppingService shoppingService
 @inject IInfoService infoService
 @page "/"
 
@@ -8,40 +11,54 @@
 <h1>My Pocket List</h1>
 
 <FluentTabs>
-    <FluentTab Label="Lists">
-        <p>Manage your lists</p>
+    <FluentTab Id="lists-tab" Label="Lists">
+        <ListsComponent ActiveList="_activeList" OnListDeleted="HandleListDeleted" OnListsChanged="HandleListsChanged" />
     </FluentTab>
-    <FluentTab Label="Shop">
-        <p>Manage your shopping items.</p>
-        <ListsComponent />
+    <FluentTab Id="shop-tab" Label="Shop">
+        <ShopComponent SelectedList="_activeList" OnListSelected="HandleListSelected" OnDataChanged="HandleDataChanged" />
     </FluentTab>
-    <FluentTab Label="Basket">
-        <p>View your shopped items</p>
+    <FluentTab Id="basket-tab" Label="Basket">
+        <BasketComponent ActiveList="_activeList" OnDataChanged="HandleDataChanged" />
     </FluentTab>
 </FluentTabs>
 
-<FluentButton Appearance="Appearance.Accent" @onclick="ShowTestAlert">
-    Show alert
-</FluentButton>
-<FluentSpacer/>
-<FluentButton Appearance="Appearance.Accent" @onclick="ShowConfirmation">
-    Test confirmation
-</FluentButton>
-
 @code {
 
-    private async void ShowTestAlert()
+    private ShoppingList? _activeList;
+
+    protected override async Task OnInitializedAsync()
     {
-        await infoService.Alert("This is some kind of test that I hope is working for me today.");
+        try
+        {
+            await listService.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            await infoService.Alert($"Could not load your lists: {ex.Message}");
+        }
+
+        _activeList = listService.Lists.FirstOrDefault();
+        if (_activeList != null)
+        {
+            shoppingService.SetShoppingList(_activeList);
+        }
     }
 
-    private async void ShowConfirmation() {
-        var res=await infoService.Confirm("Do you want to do this?");
-        if (res) {
-            await infoService.Alert("You pressed Ok");
-        }
-        else {
-            await infoService.Alert("Why did you cancel?");
+    private void HandleListSelected(ShoppingList list)
+    {
+        _activeList = list;
+        shoppingService.SetShoppingList(list);
+    }
+
+    private void HandleListDeleted(Guid id)
+    {
+        if (_activeList?.Id == id)
+        {
+            _activeList = null;
         }
     }
+
+    private void HandleListsChanged() => StateHasChanged();
+
+    private void HandleDataChanged() => StateHasChanged();
 }

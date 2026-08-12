@@ -8,6 +8,7 @@ public interface IShoppingService
 {
     Result<ShoppingItem> AddItem(string name);
     Result<ShoppingList> GetShoppedItems();
+    Result MoveToShop(Guid itemId);
     Result RemoveFromBasket(Guid id);
     Result RemoveItem(Guid itemId);
     void SetShoppingList(ShoppingList list);
@@ -70,7 +71,7 @@ public class ShoppingService : IShoppingService
         var item = _shoppingList.Items.FirstOrDefault(i => i.Id == itemId);
         if (item == null)
         {
-            return Result.Fail("Item not found");
+            return Result.Fail("Item not found.");
         }
         if (item.State == ItemState.Shopped)
         {
@@ -78,11 +79,12 @@ public class ShoppingService : IShoppingService
         }
         else if (item.State == ItemState.InBasket)
         {
-            return Result.Fail("ITem is in basket. Please remove from basket.");
+            return Result.Fail("Item is in basket. Please remove from basket.");
         }
         if (item.State == ItemState.Default)
         {
             item.State = ItemState.Shopped;
+            item.Shopped = true;
         }
         return Result.Ok();
     }
@@ -124,6 +126,24 @@ public class ShoppingService : IShoppingService
 
         //should move from basket to "shopped"
         item.State = ItemState.Shopped;
+        item.Shopped = true;
+        return Result.Ok();
+    }
+
+    public Result MoveToShop(Guid itemId)
+    {
+        var item = _shoppingList.Items.FirstOrDefault(i => i.Id == itemId);
+        if (item == null)
+        {
+            return Result.Fail("Item not found.");
+        }
+        if (item.State != ItemState.Shopped)
+        {
+            return Result.Fail("Item is not shopped.");
+        }
+
+        item.State = ItemState.Default;
+        item.Shopped = false;
         return Result.Ok();
     }
 
@@ -135,8 +155,20 @@ public class ShoppingService : IShoppingService
             return Result<ShoppingItem>.Fail("Item not found.");
         }
 
-        item.Name = newItem.Name;
+        var newName = newItem.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return Result<ShoppingItem>.Fail("Item name cannot be empty.");
+        }
+
+        if (_shoppingList.Items.Any(i => i.Id != id && i.Name.Equals(newName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Result<ShoppingItem>.Fail("Item with the same name already exists.");
+        }
+
+        item.Name = newName;
         item.State = newItem.State;
+        item.Shopped = newItem.State == ItemState.Shopped;
         return Result<ShoppingItem>.Ok(item);
     }
 }

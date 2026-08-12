@@ -1,13 +1,348 @@
 @namespace MyPocketList.Pages.Components
+@using MyPocketList.Core.Enums
+@using MyPocketList.Core.Models
+@using MyPocketList.Core.Services
+@using MyPocketList.Services
 
-<ol>
-    @foreach (var i in Items) {
-        <li>@i</li>
-    }
-</ol>
+@inject IShoppingListService listService
+@inject IInfoService infoService
+
+<h2>Lists</h2>
+<p>Create lists and manage the items in them. Click a list to show or hide its items.</p>
+
+<FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+    <FluentTextField Id="new-list-name"
+                     Label="List name"
+                     Placeholder="e.g. Weekly groceries"
+                     @bind-Value="_newListName"
+                     @onkeydown="HandleNewListKeyDown" />
+    <FluentButton Appearance="Appearance.Accent"
+                  IconStart="@(new Icons.Regular.Size20.Add())"
+                  @onclick="CreateList">
+        Add list
+    </FluentButton>
+</FluentStack>
+
+@if (listService.Lists.Count == 0)
+{
+    <p>No lists yet. Create your first shopping list above.</p>
+}
+else
+{
+    <ul class="list-rows">
+        @foreach (var list in listService.Lists)
+        {
+            <li class="list-row">
+                @if (_editingListId == list.Id)
+                {
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                        <FluentTextField Id="@($"rename-list-{list.Id:N}")"
+                                         Label="Rename list"
+                                         @bind-Value="_renameListValue"
+                                         @onkeydown="HandleRenameListKeyDown" />
+                        <FluentButton Appearance="Appearance.Accent"
+                                      IconStart="@(new Icons.Regular.Size20.Save())"
+                                      @onclick="() => SaveRenameList()">
+                            Save
+                        </FluentButton>
+                        <FluentButton IconStart="@(new Icons.Regular.Size20.Dismiss())" @onclick="CancelRenameList">
+                            Cancel
+                        </FluentButton>
+                    </FluentStack>
+                }
+                else
+                {
+                    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      IconStart="@(IsExpanded(list.Id) ? (Icon)new Icons.Regular.Size20.ChevronDown() : new Icons.Regular.Size20.ChevronRight())"
+                                      aria-label="@($"{(IsExpanded(list.Id) ? "Hide" : "Show")} items in {list.Name}")"
+                                      Title="Click to show or hide the items in this list"
+                                      @onclick="() => ToggleItems(list)">
+                            <span class="list-name">@list.Name</span>
+                        </FluentButton>
+                        <FluentBadge Appearance="Appearance.Neutral">@list.Items.Count item(s)</FluentBadge>
+                        @if (ActiveList?.Id == list.Id)
+                        {
+                            <FluentBadge Appearance="Appearance.Accent">Shopping now</FluentBadge>
+                        }
+                        <FluentSpacer />
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      IconStart="@(new Icons.Regular.Size20.Edit())"
+                                      @onclick="() => BeginRenameList(list)">
+                            Rename
+                        </FluentButton>
+                        <FluentButton Appearance="Appearance.Lightweight"
+                                      IconStart="@(new Icons.Regular.Size20.Delete())"
+                                      @onclick="() => DeleteList(list)">
+                            Delete
+                        </FluentButton>
+                    </FluentStack>
+
+                    @if (IsExpanded(list.Id))
+                    {
+                        <div class="list-items">
+                            <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                                <FluentTextField Id="@($"new-item-{list.Id:N}")"
+                                                 Label="Item name"
+                                                 Placeholder="e.g. Milk"
+                                                 Value="@GetNewItemName(list.Id)"
+                                                 ValueChanged="@((string value) => SetNewItemName(list.Id, value))"
+                                                 @onkeydown="(e) => HandleNewItemKeyDown(list, e)" />
+                                <FluentButton Appearance="Appearance.Accent"
+                                              IconStart="@(new Icons.Regular.Size20.Cart())"
+                                              @onclick="() => AddItem(list)">
+                                    Add item
+                                </FluentButton>
+                            </FluentStack>
+
+                            @if (list.Items.Count == 0)
+                            {
+                                <p>No items yet. Add your first item above.</p>
+                            }
+                            else
+                            {
+                                <ul class="list-rows">
+                                    @foreach (var item in list.Items)
+                                    {
+                                        <li class="list-row">
+                                            @if (_editingItemId == item.Id)
+                                            {
+                                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                                                    <FluentTextField Id="@($"rename-item-{item.Id:N}")"
+                                                                     Label="Rename item"
+                                                                     @bind-Value="_renameItemValue"
+                                                                     @onkeydown="(e) => HandleEditItemKeyDown(list, item, e)" />
+                                                    <FluentButton Appearance="Appearance.Accent"
+                                                                  IconStart="@(new Icons.Regular.Size20.Save())"
+                                                                  @onclick="() => SaveEditItem(list, item)">
+                                                        Save
+                                                    </FluentButton>
+                                                    <FluentButton IconStart="@(new Icons.Regular.Size20.Dismiss())" @onclick="CancelEditItem">
+                                                        Cancel
+                                                    </FluentButton>
+                                                </FluentStack>
+                                            }
+                                            else
+                                            {
+                                                <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center">
+                                                    <span class="list-name">@item.Name</span>
+                                                    @if (item.State == ItemState.Shopped)
+                                                    {
+                                                        <FluentBadge Appearance="Appearance.Neutral">Shopped</FluentBadge>
+                                                    }
+                                                    <FluentSpacer />
+                                                    <FluentButton Appearance="Appearance.Lightweight"
+                                                                  IconStart="@(new Icons.Regular.Size20.Edit())"
+                                                                  @onclick="() => BeginEditItem(item)">
+                                                        Rename
+                                                    </FluentButton>
+                                                    <FluentButton Appearance="Appearance.Lightweight"
+                                                                  IconStart="@(new Icons.Regular.Size20.Delete())"
+                                                                  @onclick="() => DeleteItem(list, item)">
+                                                        Delete
+                                                    </FluentButton>
+                                                </FluentStack>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    }
+                }
+            </li>
+        }
+    </ul>
+}
+
 @code {
 
-    public List<string> Items {get;set;}=new List<string>() {
-        "Item1", "Item2", "Item3"
-    };
+    [Parameter]
+    public ShoppingList? ActiveList { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnListDeleted { get; set; }
+
+    [Parameter]
+    public EventCallback OnListsChanged { get; set; }
+
+    private string _newListName = string.Empty;
+    private Guid? _editingListId;
+    private string _renameListValue = string.Empty;
+    private readonly HashSet<Guid> _expandedLists = new();
+    private readonly Dictionary<Guid, string> _newItemNames = new();
+    private Guid? _editingItemId;
+    private string _renameItemValue = string.Empty;
+
+    private static ShoppingService ServiceFor(ShoppingList list) => new(list);
+
+    private bool IsExpanded(Guid id) => _expandedLists.Contains(id);
+
+    private void ToggleItems(ShoppingList list)
+    {
+        if (!_expandedLists.Add(list.Id))
+        {
+            _expandedLists.Remove(list.Id);
+        }
+
+        _newItemNames.TryAdd(list.Id, string.Empty);
+    }
+
+    private string GetNewItemName(Guid id) =>
+        _newItemNames.TryGetValue(id, out var value) ? value : string.Empty;
+
+    private void SetNewItemName(Guid id, string value) => _newItemNames[id] = value;
+
+    private void HandleNewListKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _ = CreateList();
+        }
+    }
+
+    private void HandleRenameListKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _ = SaveRenameList();
+        }
+    }
+
+    private async Task CreateList()
+    {
+        var result = await listService.CreateListAsync(_newListName);
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        _newListName = string.Empty;
+        await OnListsChanged.InvokeAsync();
+    }
+
+    private void BeginRenameList(ShoppingList list)
+    {
+        _editingListId = list.Id;
+        _renameListValue = list.Name;
+    }
+
+    private async Task SaveRenameList()
+    {
+        if (_editingListId is null)
+        {
+            return;
+        }
+
+        var result = await listService.RenameListAsync(_editingListId.Value, _renameListValue);
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        _editingListId = null;
+        await OnListsChanged.InvokeAsync();
+    }
+
+    private void CancelRenameList() => _editingListId = null;
+
+    private async Task DeleteList(ShoppingList list)
+    {
+        if (!await infoService.Confirm($"Delete list \"{list.Name}\"? This cannot be undone."))
+        {
+            return;
+        }
+
+        var result = await listService.DeleteListAsync(list.Id);
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        _expandedLists.Remove(list.Id);
+        await OnListDeleted.InvokeAsync(list.Id);
+        await OnListsChanged.InvokeAsync();
+    }
+
+    private void HandleNewItemKeyDown(ShoppingList list, KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _ = AddItem(list);
+        }
+    }
+
+    private async Task AddItem(ShoppingList list)
+    {
+        var result = ServiceFor(list).AddItem(GetNewItemName(list.Id));
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        _newItemNames[list.Id] = string.Empty;
+        await listService.SaveAsync();
+        await OnListsChanged.InvokeAsync();
+    }
+
+    private void BeginEditItem(ShoppingItem item)
+    {
+        _editingItemId = item.Id;
+        _renameItemValue = item.Name;
+    }
+
+    private void HandleEditItemKeyDown(ShoppingList list, ShoppingItem item, KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _ = SaveEditItem(list, item);
+        }
+    }
+
+    private async Task SaveEditItem(ShoppingList list, ShoppingItem item)
+    {
+        if (_editingItemId != item.Id)
+        {
+            return;
+        }
+
+        var result = ServiceFor(list).Update(item.Id, new ShoppingItem
+        {
+            Name = _renameItemValue,
+            State = item.State
+        });
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        _editingItemId = null;
+        await listService.SaveAsync();
+        await OnListsChanged.InvokeAsync();
+    }
+
+    private void CancelEditItem() => _editingItemId = null;
+
+    private async Task DeleteItem(ShoppingList list, ShoppingItem item)
+    {
+        if (!await infoService.Confirm($"Delete item \"{item.Name}\" from \"{list.Name}\"?"))
+        {
+            return;
+        }
+
+        var result = ServiceFor(list).RemoveItem(item.Id);
+        if (!result.Succeeded)
+        {
+            await infoService.Alert(result.Message);
+            return;
+        }
+
+        await listService.SaveAsync();
+        await OnListsChanged.InvokeAsync();
+    }
 }

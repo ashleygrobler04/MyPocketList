@@ -81,5 +81,5 @@ public sealed class Result<T> : Result
     /// </summary>
     /// <param name="message">The error message describing the failure.</param>
     /// <returns>A failed <see cref="Result{T}"/>.</returns>
-    public static Result<T> Fail(string message) => new(false, message, default);
+    public new static Result<T> Fail(string message) => new(false, message, default);
 }
